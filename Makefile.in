@@ -1,0 +1,25 @@
+OBJ=common.o leasefile_input.o logfile_input.o oui_maclookup.o 
+FLAGS=@CFLAGS@ @DEFS@
+LIBS=@LIBS@
+
+all: $(OBJ) @LIBUSEFUL_BUNDLED@
+	gcc $(FLAGS) -oleaselist $(OBJ) main.c @LIBUSEFUL_BUNDLED@ $(LIBS) 
+
+libUseful-bundled/libUseful.a:
+	$(MAKE) -C libUseful-bundled
+
+common.o: common.h common.c
+	gcc $(FLAGS) -c common.c
+
+logfile_input.o: logfile_input.h logfile_input.c
+	gcc $(FLAGS) -c logfile_input.c
+
+leasefile_input.o: leasefile_input.h leasefile_input.c
+	gcc $(FLAGS) -c leasefile_input.c
+
+oui_maclookup.o: oui_maclookup.h oui_maclookup.c
+	gcc $(FLAGS) -c oui_maclookup.c
+
+
+clean:
+	rm leaselist *.o */*.o */*.a */*.so */*.so.* *.orig
