@@ -1,4 +1,4 @@
-AC_INIT([leaselist],[1.0])
+AC_INIT([leaselist],[2.0])
 
 AC_PROG_CC
 AC_LANG([C])

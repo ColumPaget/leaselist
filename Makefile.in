@@ -1,4 +1,4 @@
-OBJ=common.o leasefile_input.o logfile_input.o oui_maclookup.o 
+OBJ=common.o settings.o leasefile_input.o logfile_input.o oui_maclookup.o macnamesfile.o
 FLAGS=@CFLAGS@ @DEFS@
 LIBS=@LIBS@
 
@@ -11,6 +11,10 @@ libUseful-bundled/libUseful.a:
 common.o: common.h common.c
 	gcc $(FLAGS) -c common.c
 
+settings.o: settings.h settings.c
+	gcc $(FLAGS) -c settings.c
+
+
 logfile_input.o: logfile_input.h logfile_input.c
 	gcc $(FLAGS) -c logfile_input.c
 
@@ -19,6 +23,9 @@ leasefile_input.o: leasefile_input.h leasefile_input.c
 
 oui_maclookup.o: oui_maclookup.h oui_maclookup.c
 	gcc $(FLAGS) -c oui_maclookup.c
+
+macnamesfile.o: macnamesfile.h macnamesfile.c
+	gcc $(FLAGS) -c macnamesfile.c
 
 
 clean:

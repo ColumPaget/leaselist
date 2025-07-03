@@ -1,12 +1,3 @@
-leaselist - display DHCP leases in logfiles or leasefiles from ISC DHCP 
------------------------------------------------------------------------
-
-leaselist is an application that collects and displays information about leases given out by ISC DHCP, getting information either from syslog logfiles or dhcp lease files. It can limit displayed leases to those currently active, all seen today, or all seen this week. If a path is provided to a copy of the IEEE OUI file (downloadable at: https://standards-oui.ieee.org/oui/oui.txt) it can print out the device vendor who owns each mac address found in the device list.
-
-
-License
--------
-
 leaselist is released under the Gnu Public License version 3
 
 
@@ -39,7 +30,8 @@ Options
 -------
 
 ```
-  -M <path>      - path to oui.txt file containing mac-address to vendor mapping. Supplying this activates host vendor output
+  -M <path>      - path to oui.txt file containing mac-address to vendor mapping. Supplying this activates host vendor output.
+  -N <path>      - path to custom names file containing mac-address to name mapping. Defaults to '/etc/macnames.conf'.
   -h             - print lists of historical Names/IP-Addresses of hosts
   -n             - show still-active leases
   -now           - show still-active leases
@@ -54,3 +46,7 @@ Options
 ```
 
 
+MAC names file
+--------------
+
+As of version 2.0 you can supply a 'names file' to set a name to be displayed against a specific MAC address. The default path of the file is `/etc/macnames.conf' and the file format is simply a mac-address followed by whitespace, followed by a custom name which can include spaces, and then the whole record ends with newline.

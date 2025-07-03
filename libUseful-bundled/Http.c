@@ -11,6 +11,7 @@
 #include "SecureMem.h"
 #include "Errors.h"
 #include "Entropy.h"
+#include "HttpUtil.h"
 
 /* These functions relate to CLIENT SIDE http/https */
 
@@ -133,16 +134,16 @@ HTTPInfoStruct *HTTPInfoCreate(const char *Protocol, const char *Host, int Port,
 }
 
 
-char *HTTPInfoToURL(char *RetBuff, HTTPInfoStruct *Info)
+char *HTTPInfoToURL(char *RetStr, HTTPInfoStruct *Info)
 {
     char *p_proto;
-    char *Doc=NULL, *RetStr=NULL;
+    char *Doc=NULL;
 
     if (Info->Flags & HTTP_SSL) p_proto="https";
     else p_proto="http";
 
     Doc=HTTPQuoteChars(Doc,Info->Doc," ");
-    RetStr=FormatStr(RetBuff,"%s://%s:%d%s",p_proto,Info->Host,Info->Port,Info->Doc);
+    RetStr=FormatStr(RetStr, "%s://%s:%d%s",p_proto,Info->Host,Info->Port,Info->Doc);
 
     DestroyString(Doc);
     return(RetStr);
@@ -266,7 +267,11 @@ static void HTTPParseServerCookie(const char *Str)
     const char *ptr;
 
 
-    if (! Cookies) Cookies=ListCreate(LIST_FLAG_TIMEOUT);
+    if (! Cookies)
+    {
+        Cookies=ListCreate(LIST_FLAG_TIMEOUT);
+        ListSetDestroyer(Cookies, Destroy);
+    }
 
     ptr=GetNameValuePair(Str, ";", "=", &Name, &Value);
     StripTrailingWhitespace(Name);
@@ -435,6 +440,7 @@ static void HTTPParseHeader(STREAM *S, HTTPInfoStruct *Info, char *Header)
             if (strcasecmp(Token,"Content-length")==0)
             {
                 Info->ContentLength=atoi(ptr);
+                if (S->Size ==0) S->Size=strtoul(ptr, NULL, 10);
             }
             else if (strcasecmp(Token,"Content-type")==0)
             {
@@ -626,7 +632,7 @@ static char *HTTPHeadersAppendAuth(char *RetStr, const char *AuthHeader, HTTPInf
             //We should now have Logon:Password
             Nonce=SetStrLen(Nonce,len * 2);
 
-            to64frombits((unsigned char *) Nonce, (unsigned char *) Tempstr, len);
+            Nonce=EncodeBytes(Nonce, Tempstr, len, ENCODE_BASE64);
             SendStr=MCatStr(SendStr,AuthHeader,": Basic ",Nonce,"\r\n",NULL);
 
             //wipe Tempstr, because it held password for a while

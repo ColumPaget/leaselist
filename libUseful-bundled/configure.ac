@@ -1,4 +1,18 @@
-AC_INIT([libUseful], [5.50], [colums.projects@gmail.com])
+AC_INIT([libUseful], [5.58], [colums.projects@gmail.com])
+
+
+dnl define a function we can use to check if a compiler flag
+dnl is supported by the compiler
+AC_DEFUN([CHECK_COMPILER_OPT],
+[
+		COMP_OPT="$@"
+	  AC_MSG_CHECKING(["checking if compiler supports $COMP_OPT"])
+ 		OLD_CFLAGS="$CFLAGS"
+		CFLAGS="$CFLAGS $COMP_OPT"
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM(test(){return 1;})], [COMP_OPT_SUPPORT="yes"], [COMP_OPT_SUPPORT="no"])
+    AC_MSG_RESULT([$COMP_OPT_SUPPORT])
+		AS_IF([test "$COMP_OPT_SUPPORT" != "yes"], [CFLAGS="$OLD_CFLAGS"])
+])  
 
 m4_ifdef([AC_PROG_AR], [AC_PROG_AR])
 AS_IF([test "$AR" = ""], [
@@ -19,6 +33,8 @@ AC_LANG([C])
 AC_PROG_MAKE_SET
 AC_PROG_EGREP
 AC_SYS_LARGEFILE
+AC_C_VOLATILE
+AC_C_INLINE
 
 cf_have_libssl=no
 cf_have_libcrypto=no
@@ -31,12 +47,14 @@ cf_use_xattr=no
 cf_use_hashopenssl=auto
 
 
+AC_SUBST([LICENSE], "GPLv3")
 AC_ARG_ENABLE([lgpl],
     [AS_HELP_STRING([--enable-lgpl], [build code licensed under Lesser Gnu Public License (excludes some features like sha1 hashing)])],
     [cf_use_lgpl=$enableval],
     [cf_use_lgpl=no]
 )
 AS_IF([test "$cf_use_lgpl" = "yes"], [
+    AC_SUBST([LICENSE], "LGPL")
     AC_DEFINE([USE_LGPL])
 ])
 
@@ -95,9 +113,19 @@ AS_IF([test "$cf_use_soname" != "no"], [
 ])
 
 
-AS_IF([test "$cf_use_harden" = "yes"], [
+
+AS_IF([test "$cf_use_harden" = "yes"], 
+[
     cf_use_fortify="yes"
     cf_use_stackprotect="yes"
+
+		CHECK_COMPILER_OPT("-ftrivial-auto-var-init=zero")
+		CHECK_COMPILER_OPT("-fstack-clash-protection")
+		CHECK_COMPILER_OPT("-fno-strict-overflow")
+		CHECK_COMPILER_OPT("-fno-strict-aliasing")
+		CHECK_COMPILER_OPT("-fno-delete-null-pointer-checks")
+		CHECK_COMPILER_OPT("-fcf-protection=full")
+		CHECK_COMPILER_OPT("-mmitigate-rop")
 ])
 
 
@@ -106,7 +134,8 @@ AS_IF([test "$cf_use_fortify" = "yes"], [
 ])
 
 AS_IF([test "$cf_use_stackprotect" = "yes"], [
-    CFLAGS="$CFLAGS -fstack-protector-strong"
+		CHECK_COMPILER_OPT("-fstack-protector-strong")
+		AS_IF([test "$COMP_OPT_SUPPORT" != "yes"], [cf_use_stackprotect="no"])
 ])
 
 
@@ -116,17 +145,30 @@ AC_CHECK_LIB(c,get_current_dir_name, AC_DEFINE([HAVE_GET_CURR_DIR]),)
 AC_CHECK_FUNCS(getloadavg sysinfo sysconf getpagesize ptsname_r clearenv setresuid initgroups poll mlock mlockall munlockall madvise htonll ntohll mkostemp mount umount umount2 getentropy prctl)
 
 
+AC_ARG_ENABLE([strlen-cache],
+    [AS_HELP_STRING([--enable-strlen-cache], [use 'strlen cache' feature. This can improve performance with large strings (documents) on old systems without AVX strlen instructions.])],
+    [cf_use_strlen_cache=$enableval],
+    [cf_use_strlen_cache=yes]
+)
+
+AS_IF([test "$cf_use_strlen_cache" != "no"], AC_DEFINE([USE_STRLEN_CACHE]))
+
+
 AC_ARG_ENABLE([sendfile],
     [AS_HELP_STRING([--enable-sendfile], [enable 'fastcopy' sendfile support])],
     [cf_use_sendfile=$enableval],
     [cf_use_sendfile=auto]
 )
+
 AS_IF([test "$cf_use_sendfile" != "no"], [
     AC_CHECK_HEADER(sys/sendfile.h,cf_use_sendfile=yes,cf_use_sendfile=no,)
     AS_IF([test "$cf_use_sendfile" != "no"], [
 	AC_CHECK_FUNC(sendfile, AC_DEFINE([HAVE_SENDFILE]))
     ])
 ])
+
+
+
 
 
 AC_CHECK_HEADER(sys/random.h,cf_use_sys_random=yes,cf_use_sys_random=no,)
@@ -179,6 +221,7 @@ AC_ARG_ENABLE([crc32],
     [cf_use_crc32=yes]
 )
 
+dnl LGPL disables crc32, as that code is GPLv3
 AS_IF([test "$cf_use_lgpl" = "yes"],[
 	  cf_use_crc32=no
 ])
@@ -207,6 +250,8 @@ AC_ARG_ENABLE([sha1],
     [cf_use_sha1=yes]
 )
 
+
+dnl LGPL disables sha1, as that code is GPLv3
 AS_IF([test "$cf_use_lgpl" = "yes"],[
 	  cf_use_sha1=no
 ])
@@ -396,11 +441,12 @@ echo "compile with -Wall - $cf_use_wall"
 echo "compile with -Werror - $cf_use_werror"
 echo "compile with FORTIFY_SOURCE=3 - $cf_use_fortify"
 echo "compile with -fstack-protector-strong - $cf_use_stackprotect"
+echo "CFLAGS=$CFLAGS"
 
 AS_IF([test "$ac_cv_sys_file_offset_bits" = "64"], [
-    echo "Largefiles ( > 2GB ) enabled"
+    echo "Largefiles ( > 2GB on 32bit x86) enabled"
 ], [
-    echo "Largefiles ( > 2GB ) NOT enabled"
+    echo "Largefiles ( > 2GB on 32bit x86) NOT enabled"
 ])
 
 AS_IF([test "$cf_have_getxattr" = "yes"], [

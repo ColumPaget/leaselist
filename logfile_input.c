@@ -255,6 +255,8 @@ int LogFileRead(const char *Path, ListNode *Hosts)
     char *Tempstr=NULL;
     int RetVal=FALSE;
 
+    fprintf(stderr, "LFR: %s\n", Path);
+
     S=STREAMOpen(Path, "r");
     if (S)
     {

@@ -1,17 +1,19 @@
 #include "leasefile_input.h"
 
 
-static void LeaseFileGetHostName(THost *Host, const char *Input)
+static void LeaseFileGetVendorID(THost *Host, const char *Input)
 {
     char *Token=NULL;
     const char *ptr;
 
     ptr=GetToken(Input, "\\S", &Token, 0);
+
     if (CompareStr(Token, "vendor-class-identifier")==0)
     {
         ptr=GetToken(ptr, "\\S", &Token, 0);
-        ptr=GetToken(ptr, ";", &(Host->Name), GETTOKEN_QUOTES);
+        ptr=GetToken(ptr, ";", &(Host->VendorID), GETTOKEN_QUOTES);
     }
+
 
     Destroy(Token);
 }
@@ -60,10 +62,10 @@ static THost *LeaseFileParseLine(ListNode *Hosts, THost *Host, const char *Input
             ptr=GetToken(ptr, "\\S|;", &(Host->MAC), GETTOKEN_MULTI_SEP);
             //now we have a mac, we can add the host to the hostlist
         }
-        else if (CompareStr(Token, "set")==0) LeaseFileGetHostName(Host, ptr);
+        else if (CompareStr(Token, "set")==0) LeaseFileGetVendorID(Host, ptr);
         else if (CompareStr(Token, "starts")==0) Host->FirstSeen=LeaseFileGetTime(Host, ptr);
         else if (CompareStr(Token, "ends")==0) Host->LastSeen=LeaseFileGetTime(Host, ptr);
-
+        else if (CompareStr(Token, "client-hostname")==0) ptr=GetToken(ptr, ";", &(Host->Name), GETTOKEN_QUOTES);
     }
 
     Destroy(Tempstr);

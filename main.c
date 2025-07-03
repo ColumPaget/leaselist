@@ -2,72 +2,42 @@
 #include "logfile_input.h"
 #include "leasefile_input.h"
 #include "oui_maclookup.h"
-
-
-void PrintHelp()
-{
-
-    printf("usage: leaselist [options] [path] [path] ...\n");
-    printf("  -M <path>      - path to oui.txt file containing mac-address to vendor mapping. Supplying this activates host vendor output\n");
-    printf("  -h             - print lists of historical Names/IP-Addresses of hosts\n");
-    printf("  -n             - show still-active leases\n");
-    printf("  -now           - show still-active leases\n");
-    printf("  -t             - show leases given today\n");
-    printf("  -today         - show leases given today\n");
-    printf("  -w             - show leases given this week\n");
-    printf("  -week          - show leases given this week\n");
-    printf("  -help          - print this help\n");
-    printf("  --help         - print this help\n");
-    printf("  -?             - print this help\n");
-
-    exit(0);
-}
+#include "macnamesfile.h"
+#include "settings.h"
 
 
 
-ListNode *ParseCommandLine(int argc, char *argv[])
-{
-    CMDLINE *CMD;
-    ListNode *InputFiles;
-    const char *item;
 
-    InputFiles=ListCreate();
-    CMD=CommandLineParserCreate(argc, argv);
-
-    item=CommandLineNext(CMD);
-    while (item)
-    {
-        if (strcmp(item, "-M")==0) OUIMacFile=CopyStr(OUIMacFile, CommandLineNext(CMD));
-        else if (strcmp(item, "-h")==0) Flags |= FLAG_HISTORY;
-        else if (strcmp(item, "-n")==0) Flags |= FLAG_NOW;
-        else if (strcmp(item, "-now")==0) Flags |= FLAG_NOW;
-        else if (strcmp(item, "-t")==0) Flags |= FLAG_TODAY;
-        else if (strcmp(item, "-today")==0) Flags |= FLAG_TODAY;
-        else if (strcmp(item, "-w")==0) Flags |= FLAG_WEEK;
-        else if (strcmp(item, "-week")==0) Flags |= FLAG_WEEK;
-        else if (strcmp(item, "-help")==0) PrintHelp();
-        else if (strcmp(item, "--help")==0) PrintHelp();
-        else if (strcmp(item, "-?")==0) PrintHelp();
-        else ListAddNamedItem(InputFiles, item, NULL);
-        item=CommandLineNext(CMD);
-    }
-
-    return(InputFiles);
-}
-
-
-
-void OutputHost(THost *Host, int IsRecent, ListNode *OUIMacList)
+void OutputHost(THost *Host, time_t Age, ListNode *OUIMacList)
 {
     char *Tempstr=NULL, *First=NULL, *Last=NULL, *Token=NULL;
+    char *Name=NULL, *TimePrefix=NULL;
+    const char *ptr;
 
-    if (IsRecent) First=MCopyStr(First, "~e~w", GetDateStrFromSecs("%Y-%m-%dT%H:%M:%S", Host->FirstSeen, NULL), "~0", NULL);
-    else First=CopyStr(First, GetDateStrFromSecs("~c%Y-%m-%dT%H:%M:%S~0", Host->FirstSeen, NULL));
 
-    if (IsRecent) Last=MCopyStr(Last, "~e~w", GetDateStrFromSecs("%Y-%m-%dT%H:%M:%S", Host->LastSeen, NULL), "~0", NULL);
-    else Last=CopyStr(Last, GetDateStrFromSecs("~m%Y-%m-%dT%H:%M:%S~0", Host->LastSeen, NULL));
+    if (Age < 3600) TimePrefix=CopyStr(TimePrefix, "~w~e");
+    else if (Age < (3600 * 24)) TimePrefix=CopyStr(TimePrefix, "~w");
+    else TimePrefix=CopyStr(TimePrefix, "~c");
 
-    Tempstr=FormatStr(Tempstr, "%s   %s  ~e%s~0 %6s:%-15s ~e~c%-20s~0", First, Last, Host->MAC, Host->Dev, Host->IP, Host->Name);
+
+    First=MCopyStr(First, TimePrefix, GetDateStrFromSecs("%Y-%m-%dT%H:%M:%S", Host->FirstSeen, NULL), "~0", NULL);
+
+    Last=MCopyStr(Last, TimePrefix, GetDateStrFromSecs("%Y-%m-%dT%H:%M:%S", Host->LastSeen, NULL), "~0", NULL);
+
+    Name=CopyStr(Name, Host->Name);
+    if (StrValid(Host->VendorID))
+    {
+        if (StrValid(Name)) Name=CatStr(Name, " - ");
+        Name=CatStr(Name, Host->VendorID);
+    }
+
+    ptr=MacNamesFind(Host->MAC);
+    if (StrValid(ptr))
+    {
+        Name=MCatStr(Name, " - ~m", ptr, "~0", NULL);
+    }
+
+    Tempstr=FormatStr(Tempstr, "%s   %s  ~e%s~0 %6s:%-15s ~e~c%-20s~0", First, Last, Host->MAC, Host->Dev, Host->IP, Name);
     if (OUIMacList)
     {
         Token=CopyStrLen(Token, Host->MAC, 8);
@@ -80,6 +50,7 @@ void OutputHost(THost *Host, int IsRecent, ListNode *OUIMacList)
     Destroy(Tempstr);
     Destroy(First);
     Destroy(Last);
+    Destroy(Name);
     Destroy(Token);
 }
 
@@ -147,43 +118,53 @@ int DetectFileType(const char *Path)
     return(FileType);
 }
 
+
+
 main(int argc, char *argv[])
 {
-    char *Tempstr=NULL;
-    ListNode *InputFiles=NULL, *Hosts=NULL, *OUIMacList=NULL, *Curr;
+    char *Tempstr=NULL, *Path=NULL;
+    ListNode *Hosts=NULL, *OUIMacList=NULL, *Curr;
+    const char *ptr;
     THost *Host;
     time_t Now, Age;
-    int IsRecent=FALSE;
 
+
+    SettingsInit();
     //this app doesn't need much permissions, so set some strict security
     //if the underlying libuseful supports it
     ProcessApplyConfig("nosu w^x security=untrusted");
 
     CurrYear=CopyStr(CurrYear, GetDateStr("%Y", NULL));
-    LeaseFilesPath=CopyStr(LeaseFilesPath, "/var/state/dhcp/dhcpd.leases:/var/lib/dhcpd/dhcpd.leases");
-    InputFiles=ParseCommandLine(argc, argv);
+    ParseCommandLine(argc, argv);
+
+    OUIMacList=OUIMacFileLoad(Settings->OUIMacFiles);
+    MacNamesLoad(Settings->NamesFiles);
 
     Now=GetTime(0);
     Hosts=MapCreate(4096, LIST_FLAG_CACHE);
-    if (StrValid(OUIMacFile)) OUIMacList=OUIMacFileLoad(OUIMacFile);
 
 
-    if (ListSize(InputFiles) > 0)
+    if (StrValid(Settings->InputFiles))
     {
-        Curr=ListGetNext(InputFiles);
-        while (Curr)
+        ptr=GetToken(Settings->InputFiles, ":", &Path, 0);
+        while (ptr)
         {
-            switch (DetectFileType(Curr->Tag))
-	    {
-		case FT_LEASE_FILE: LeaseFilesFind(Curr->Tag, Hosts); break;
-		case FT_DHCPLOG_FILE: LogFileRead(Curr->Tag, Hosts); break;
-		default: printf("Unknown File Type: %s\n", Curr->Tag);
+            switch (DetectFileType(Path))
+            {
+            case FT_LEASE_FILE:
+                LeaseFilesFind(Path, Hosts);
+                break;
+            case FT_DHCPLOG_FILE:
+                LogFileRead(Path, Hosts);
+                break;
+            default:
+                printf("Unknown File Type: %s\n", Curr->Tag);
             }
 
-            Curr=ListGetNext(Curr);
+            ptr=GetToken(ptr, ":", &Path, 0);
         }
     }
-    else LeaseFilesFind(LeaseFilesPath, Hosts);
+    else LeaseFilesFind(Settings->LeaseFiles, Hosts);
 
 
     Curr=ListGetNext(Hosts);
@@ -195,14 +176,12 @@ main(int argc, char *argv[])
 
         if (IncludeInOutput(Age))
         {
-            if (Age < (3600 * 24)) IsRecent=TRUE;
-            else IsRecent=FALSE;
-
-            OutputHost(Host, IsRecent, OUIMacList);
+            OutputHost(Host, Age, OUIMacList);
         }
 
         Curr=ListGetNext(Curr);
     }
 
     Destroy(Tempstr);
+    Destroy(Path);
 }

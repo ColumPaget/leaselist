@@ -1,0 +1,5 @@
+v2.0 (2025-07-03)
+* added mac-to-custom-names mapping file
+* support 'client-hostname' field in dhcpd.leases
+
+

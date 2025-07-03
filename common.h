@@ -16,6 +16,7 @@
 typedef struct
 {
     char *Name;
+    char *VendorID;
     char *MAC;
     char *IP;
     char *Dev;

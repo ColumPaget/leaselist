@@ -1,4 +1,56 @@
-v5.50 (2025-04012)
+v5.58 (2025-07-02)
+  * Fix unguarded PR_MDWE_NO_INHERIT in Process.c. Not all linux kernels/headers have this flag.
+  * Added TERM_NEWLINE flag so TerminalReadPrompt can go to a newline after entry if desired
+  * Add TextPrompt theming
+  * Many improvements to PasswordFile.c including file locking, credential deletion, handle 'bad' chars in username, password and extra
+
+
+v5.57 (2025-06-16)
+  * Fix unguarded 'mount' in Container.c that prevents compile on non-linux platforms
+  * Add FindFileInPathSubDirectory, FindFilesInPathSubDirectory and FindFileInPrefixSubDirectory search functions to FileSystem.c
+  * Search harder for unicode-names.conf file using FindFileInPrefixSubDirectory 
+  * Optimise unicode names lookup support so we don't scan through unicode-names.conf for every character we lookup
+  * Add nerdfonts support using nerdfont.csv downloaded from  https://github.com/8bitmcu/NerdFont-Cheat-Sheet
+
+v5.56
+  * ditch attempted 'luarocks' support
+  * set STREAM->Size for http streams from Content-Length
+  * Fix unguarded 'unshare' in Containers.c preventing compile on systems that don't have that call (thanks again to barracuda156@github.com)
+  * Fix possible underflow in 'memset' in TerminalReadTextWithPrefix if typed string is zero length
+
+
+v5.55 (2025-05-28)
+  * use 'listen' on all server sockets. We've been getting away without it all these years.
+  * honor both 'TodayAttribs' and any 'StateAttribs' for a day in TerminalCalendar, so current day is always highlighted
+  * ListStats now stores 'AccessTime' if LIST_FLAG_TIMEOUT is not set
+  * ListSetMaxItems function added
+  * ListSetDestroyer function added
+  * ContainersApplyConfig now automatically switches to a 'user namespace' is current uid is not 0 (user is not root)
+  * ProcessApplyConfig 'security=nonet' now uses namespaces in addition to seccomp in order to limit network acccess
+  * externalize StrLenCacheInit function
+  
+
+v5.54 (2025-05-13)
+  * better debugging/error display for OpenSSL operations
+  * add more '--enable-harden' compiler flags
+
+v5.53 (2025-05-12)
+  * fix 'GetCertificateValue' function that's preventing compilation without openssl
+  * do not include 'bind' in 'server functions' in seccomp: binding to port 0 is needed in client mode and seccomp cannot see into a sockaddr object
+  * ongoing saga of MacOS support continues
+
+v5.52 (2025-05-11)
+  * Yet more work on MacOS compilation
+  * More work on seccomp, new seccomp 'levels' and 'modifiers' added
+  * added StringListToUnique function
+
+v5.51 (2025-05-03)
+  * Support 'inner text' within terminal progress bars
+  * Add more compiler-hardening options for ./configure --enable-harden 
+  * Make sure non-lgpl licensed parts are not compiled in, rather than just not called, if compiled with --enable-lgpl
+  * More changes from barracuda156@github.com for compiling on MacOS
+
+v5.50 (2025-04-12)
   * Add TerminalCalendarSetDateStrState
   * Add strcount
 
